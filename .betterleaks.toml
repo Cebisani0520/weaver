@@ -1,0 +1,15 @@
+# Betterleaks is config-compatible with Gitleaks: start from the default rules
+# and allow only what is known to be safe.
+title = "weaver"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Floci accepts any non-empty credentials; 'test' is not a secret"
+regexes = [
+  '''(?i)(access_key|secret_key|aws_access_key_id|aws_secret_access_key)\s*[:=]\s*"test"''',
+]
+paths = [
+  '''uv\.lock''',
+]

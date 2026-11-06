@@ -1,0 +1,9 @@
+# Secrets for local containers and CI, used instead of .env files.
+#
+# Week 1 needs no real secrets: Floci accepts any non-empty credentials and the
+# local broker runs without auth. Real secrets arrive with npr (Confluent Cloud
+# API keys, which the core stack stores in SSM) and with later local services.
+#
+# Copy the provider block your team already uses (for example age or a cloud
+# secrets manager) from your existing project's fnox.toml, then declare secrets
+# here and read them with `fnox exec -- <command>`.

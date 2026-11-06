@@ -1,0 +1,17 @@
+formatter: markdown table
+
+output:
+  file: TERRAFORM.md
+  mode: replace
+
+sort:
+  enabled: true
+  by: required
+
+settings:
+  anchor: false
+  default: true
+  description: true
+  hide-empty: true
+  required: true
+  type: true

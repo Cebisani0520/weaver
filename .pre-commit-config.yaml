@@ -1,0 +1,79 @@
+# All hooks run tools pinned by .mise.toml (language: system), so there are no
+# hook repositories to keep in step. Run everything with `mise run lint`.
+default_install_hook_types: [pre-commit]
+
+repos:
+  - repo: local
+    hooks:
+      - id: betterleaks
+        name: betterleaks (staged secrets)
+        entry: betterleaks git --pre-commit --staged
+        language: system
+        pass_filenames: false
+
+      - id: terraform-fmt
+        name: terraform fmt
+        entry: terraform fmt -check -recursive -diff infra
+        language: system
+        files: \.(tf|tfvars)$
+        pass_filenames: false
+
+      - id: tflint
+        name: tflint
+        entry: bash -c 'tflint --init --config "$(git rev-parse --show-toplevel)/.tflint.hcl" >/dev/null && tflint --recursive --chdir infra --config "$(git rev-parse --show-toplevel)/.tflint.hcl"'
+        language: system
+        files: \.tf$
+        pass_filenames: false
+
+      - id: no-resources-in-stacks
+        name: stacks only call modules
+        entry: uv run python -m scripts.check_stack_resources
+        language: system
+        files: ^infra/stacks/
+        pass_filenames: false
+
+      - id: floci-endpoints
+        name: every AWS service has a Floci endpoint
+        entry: uv run python -m scripts.check_floci_endpoints
+        language: system
+        files: ^infra/
+        pass_filenames: false
+
+      - id: terraform-docs
+        name: terraform-docs (TERRAFORM.md)
+        entry: scripts/terraform_docs_staged.sh
+        language: system
+        files: ^infra/(modules|stacks)/.*\.tf$
+        pass_filenames: false
+
+      - id: ruff
+        name: ruff
+        entry: uv run ruff check --fix
+        language: system
+        types: [python]
+
+      - id: ruff-format
+        name: ruff format
+        entry: uv run ruff format
+        language: system
+        types: [python]
+
+      - id: mypy
+        name: mypy
+        entry: uv run mypy
+        language: system
+        types: [python]
+        pass_filenames: false
+
+      - id: shellcheck
+        name: shellcheck
+        entry: shellcheck
+        language: system
+        types: [shell]
+
+      - id: unit-tests
+        name: unit tests
+        entry: uv run pytest -q tests/unit
+        language: system
+        pass_filenames: false
+        files: ^(scripts|tests|infra)/

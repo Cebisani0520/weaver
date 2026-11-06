@@ -1,0 +1,39 @@
+[project]
+name = "weaver"
+version = "0.1.0"
+description = "Real-time ML decisioning on Kafka events: Flink features, SageMaker scoring, decisions back on Kafka."
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = []
+
+[dependency-groups]
+dev = [
+  "boto3>=1.35",
+  "mypy>=1.13",
+  "pytest>=8.3",
+  "python-hcl2>=7.0",
+  "ruff>=0.8",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+markers = [
+  "integration: needs the local runtime (mise run up)",
+  "e2e: needs the full local stack with Flink statements deployed",
+]
+addopts = "-ra"
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "S", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+"conftest.py" = ["S101"]
