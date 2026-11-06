@@ -7,6 +7,6 @@ kind_node_image            = "kindest/node:v1.37.0"
 #   helm search repo confluentinc --versions
 chart_versions = {
   cert_manager   = "v1.21.3"
-  flink_operator = null
-  cmf            = null
+  flink_operator = "1.161.1" # image flink-kubernetes-operator-1.161.1
+  cmf            = "2.5.0"   # image cp-cmf:2.5.0
 }
