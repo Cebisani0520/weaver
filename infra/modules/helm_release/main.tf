@@ -8,6 +8,8 @@ resource "helm_release" "this" {
   values           = var.values
   wait             = true
   timeout          = var.timeout
+  atomic           = true # a failed install is rolled back, so the name is free on the next apply
+  cleanup_on_fail  = true
 
   set = [for key, value in var.set : { name = key, value = value }]
 }
