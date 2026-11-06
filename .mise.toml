@@ -2,6 +2,9 @@
 # Versions are pinned to a minor line; run `mise upgrade` deliberately, in its
 # own pull request, and commit the result.
 
+# [settings]
+# lockfile = true
+
 [tools]
 terraform = "latest"
 tflint = "latest"
@@ -20,3 +23,80 @@ git-cliff = "latest"
 # Not in mise's core registry: installed from GitHub releases.
 "github:confluentinc/cli" = "4"
 "github:betterleaks/betterleaks" = "1"
+
+[env]
+# The kind node joins the shared Docker network so pods reach broker,
+# schema-registry and floci by name.
+KIND_EXPERIMENTAL_DOCKER_NETWORK = "weaver"
+KUBECONFIG = "{{config_root}}/.kube/weaver"
+FLINK_NAMESPACE = "default"
+# AWS_* variables are deliberately NOT set here, so a shell in this repo never
+# points real AWS tooling at Floci by accident. Use `mise run floci-env`.
+
+[tasks.up]
+description = "Start the local runtime (Floci, Kafka, Schema Registry, Kafka UI, kind + CMF) and prove the local root"
+run = [
+  "terraform -chdir=infra/environments/local/runtime init -input=false",
+  # The cluster first: the Helm provider reads the kubeconfig it writes.
+  "terraform -chdir=infra/environments/local/runtime apply -input=false -auto-approve -target=module.runtime.module.network -target=module.runtime.module.kind",
+  # Large images from the host cache into the node, so Helm never waits on a cold pull.
+  "scripts/preload_kind_images.sh",
+  "terraform -chdir=infra/environments/local/runtime apply -input=false -auto-approve",
+  "scripts/wait_for_local.sh",
+  "terraform -chdir=infra/environments/local init -input=false -reconfigure",
+  "terraform -chdir=infra/environments/local apply -input=false -auto-approve",
+]
+
+[tasks.status]
+description = "Health of every local component"
+run = "scripts/wait_for_local.sh 5"
+
+[tasks.smoke]
+description = "From a pod in kind, reach broker, Schema Registry and Floci by name (Gate 1)"
+run = "scripts/smoke_kind_network.sh"
+
+[tasks.cmf]
+description = "Port-forward the CMF REST API to localhost:8080"
+run = "scripts/cmf_port_forward.sh"
+
+[tasks.deploy]
+description = "Apply an environment root: local, npr or prod"
+usage = 'arg "<env>" help="local, npr or prod"'
+run = [
+  "terraform -chdir=infra/environments/${usage_env} init -input=false",
+  "terraform -chdir=infra/environments/${usage_env} apply -input=false",
+]
+
+[tasks.down]
+description = "Destroy the local environment root, then the local runtime"
+run = [
+  "terraform -chdir=infra/environments/local destroy -input=false -auto-approve || true",
+  # Containers Floci started itself (floci-ui, later SageMaker containers) would
+  # otherwise keep the network from being deleted.
+  "scripts/cleanup_network_containers.sh",
+  "terraform -chdir=infra/environments/local/runtime destroy -input=false -auto-approve",
+]
+
+[tasks.floci-env]
+description = "Print exports that point the AWS CLI and SDKs at Floci: eval \"$(mise run floci-env)\""
+run = """
+echo 'export AWS_ENDPOINT_URL=http://localhost:4566'
+echo 'export AWS_DEFAULT_REGION=eu-west-1'
+echo 'export AWS_ACCESS_KEY_ID=test'
+echo 'export AWS_SECRET_ACCESS_KEY=test'
+"""
+
+[tasks.test]
+description = "Unit tests, plus integration tests when the local runtime is up"
+run = "uv run pytest"
+
+[tasks.lint]
+description = "Every pre-commit hook against every file"
+run = "pre-commit run --all-files"
+
+[tasks.setup]
+description = "One-time setup after cloning: Python env and git hooks"
+run = [
+  "uv sync",
+  "pre-commit install",
+]
