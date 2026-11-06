@@ -1,0 +1,100 @@
+# Terraform
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+.tfcache
+
+# Terraform overrides
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+# !example_override.tf  # Uncomment to explicitly include specific overrides
+
+# Terraform plan files
+*.tfplan
+
+# Terraform crash logs
+crash.log
+crash.*.log
+
+# Terraform CLI configuration files
+.terraformrc
+terraform.rc
+
+# Backup files
+*.backup
+*.bak
+
+# Python
+*.py[cod]
+__pycache__/
+.venv/
+venv/
+
+# Python testing and coverage
+.coverage
+.cache/
+.pytest_cache/
+htmlcov/
+
+# Node.js
+node_modules/
+package-lock.json
+
+# Zipped text files
+*.gz
+# # Exclude deployment docs
+# !docs/deployments/**/*.gz
+#
+# Lambda packages
+*.zip
+lambda.zip
+
+# Local environment and secrets
+.env
+.env.*
+
+# AWS credentials (if present locally — usually avoid storing here)
+.aws/
+
+# Logs
+*.log
+
+# Editor-specific
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# macOS / Windows system files
+.DS_Store
+Thumbs.db
+
+# Jupyter notebooks (if used)
+.ipynb_checkpoints/
+
+# Ignore Git Worktree directories
+**/worktree*/
+**/.worktree*/
+
+# # Local files
+# _local_docs
+# claude.md
+#
+.claude/
+/repomix.config.json
+/repomix-output.xml
+repomix-*.config.json
+
+# # AI agent guidance files (not committed)
+# CLAUDE.md
+# AGENTS.md
+#
+# JS packages
+node_modules/
+package-lock.json
+
+# # Local builds
+# **/build/

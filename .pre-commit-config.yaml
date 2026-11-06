@@ -3,77 +3,132 @@
 default_install_hook_types: [pre-commit]
 
 repos:
-  - repo: local
+  # ---------------------------
+  # General hooks - file formatting and checks
+  # ---------------------------
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-yaml
+        args: [--allow-multiple-documents]
+      - id: check-json
+      - id: check-toml
+      - id: end-of-file-fixer
+        exclude: \.(MD|md|tf)$
+      - id: trailing-whitespace
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=3072]
+      - id: check-executables-have-shebangs
+      - id: debug-statements
+        files: \.py$
+      - id: check-ast
+        files: \.py$
+      - id: check-docstring-first
+        files: \.py$
+
+  # ---------------------------
+  # Betterleaks - Secrets Scanning
+  # ---------------------------
+  - repo: https://github.com/betterleaks/betterleaks
+    rev: v2.0.0-rc.7
     hooks:
       - id: betterleaks
-        name: betterleaks (staged secrets)
-        entry: betterleaks git --pre-commit --staged
-        language: system
-        pass_filenames: false
 
-      - id: terraform-fmt
-        name: terraform fmt
-        entry: terraform fmt -check -recursive -diff infra
-        language: system
-        files: \.(tf|tfvars)$
-        pass_filenames: false
-
-      - id: tflint
-        name: tflint
-        entry: bash -c 'tflint --init --config "$(git rev-parse --show-toplevel)/.tflint.hcl" >/dev/null && tflint --recursive --chdir infra --config "$(git rev-parse --show-toplevel)/.tflint.hcl"'
-        language: system
-        files: \.tf$
-        pass_filenames: false
-
-      - id: no-resources-in-stacks
-        name: stacks only call modules
-        entry: uv run python -m scripts.check_stack_resources
-        language: system
-        files: ^infra/stacks/
-        pass_filenames: false
-
-      - id: floci-endpoints
-        name: every AWS service has a Floci endpoint
-        entry: uv run python -m scripts.check_floci_endpoints
-        language: system
-        files: ^infra/
-        pass_filenames: false
-
-      - id: terraform-docs
-        name: terraform-docs (TERRAFORM.md)
-        entry: scripts/terraform_docs_staged.sh
-        language: system
-        files: ^infra/(modules|stacks)/.*\.tf$
-        pass_filenames: false
-
-      - id: ruff
-        name: ruff
-        entry: uv run ruff check --fix
-        language: system
-        types: [python]
-
+  # ---------------------------
+  # Python hooks - code quality and formatting
+  # ---------------------------
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.17.4
+    hooks:
+      # Run the linter (with fixes) before the formatter so fixes are reformatted.
+      - id: ruff-check
+        files: \.py$
+        args: [--fix]
       - id: ruff-format
-        name: ruff format
-        entry: uv run ruff format
-        language: system
-        types: [python]
+        files: \.py$
 
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v2.4.1
+    hooks:
       - id: mypy
-        name: mypy
-        entry: uv run mypy
-        language: system
-        types: [python]
-        pass_filenames: false
+        files: ^(scripts|services|tests)/.*\.py$
+        # mypy runs in its own environment, so it needs the packages the code imports.
+        additional_dependencies: [types-requests, pytest, boto3-stubs, python-hcl2]
 
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.9.4
+    hooks:
+      - id: bandit
+        files: \.py$
+        args: [-s, B101, B311, B603]
+        exclude: ^(tests)/.*
+
+  # ---------------------------
+  # Shell hooks
+  # ---------------------------
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.11.0.1-1
+    hooks:
       - id: shellcheck
-        name: shellcheck
-        entry: shellcheck
-        language: system
-        types: [shell]
 
-      - id: unit-tests
-        name: unit tests
-        entry: uv run pytest -q tests/unit
+  # ---------------------------
+  # Terraform hooks - code quality and security
+  # ---------------------------
+  - repo: https://github.com/antonbabenko/pre-commit-terraform
+    rev: v1.109.4
+    hooks:
+      - id: terraform_fmt
+        files: ^(infra)/.*\.(tf|tfvars)$
+
+      - id: terraform_tflint
+        args:
+          - --args=--config=__GIT_WORKING_DIR__/.tflint.hcl
+        files: ^(infra)/.*\.tf$
+
+      - id: terraform_trivy
+        args:
+          - --args=--skip-dirs="**/.terraform"
+        files: ^(infra)/.*\.tf$
+
+  # ---------------------------
+  # Custom hooks - project-specific
+  # ---------------------------
+  - repo: local
+    hooks:
+      # - id: pytest
+      #   name: Run pytest
+      #   description: Runs the unit tests, including the Terraform layout and repo-rule tests
+      #   entry: uv run pytest tests/unit/ -x -q
+      #   language: system
+      #   pass_filenames: false
+      #   files: ^(services|tests|scripts)/
+      #   require_serial: true
+      #
+      # - id: no-resources-in-stacks
+      #   name: Stacks only call modules
+      #   description: Fails if any infra/stacks file defines a resource block
+      #   entry: uv run python -m scripts.check_stack_resources
+      #   language: system
+      #   pass_filenames: false
+      #   files: ^infra/stacks/.*\.tf$
+      #
+      # - id: floci-endpoints
+      #   name: Every local AWS service has a Floci endpoint
+      #   description: Walks each local root's module tree and checks its provider endpoints block
+      #   entry: uv run python -m scripts.check_floci_endpoints
+      #   language: system
+      #   pass_filenames: false
+      #   files: ^infra/.*\.tf$
+      #
+      # Generate documentation only for staged files
+      - id: terraform-docs-generator
+        name: Terraform Documentation Generator
+        description: Generates Terraform documentation only for modules/stacks with staged changes
+        entry: bash -c 'cd $(git rev-parse --show-toplevel) && ./scripts/terraform_docs_staged.sh'
         language: system
         pass_filenames: false
-        files: ^(scripts|tests|infra)/
+        files: ^infra/(modules|stacks)/.*\.tf$
+        require_serial: true

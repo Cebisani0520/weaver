@@ -1,1 +1,22 @@
+# Tools and tasks for Weaver. `mise install` installs every tool below.
+# Versions are pinned to a minor line; run `mise upgrade` deliberately, in its
+# own pull request, and commit the result.
 
+[tools]
+terraform = "latest"
+tflint = "latest"
+terraform-docs = "latest"
+kind = "0.27"
+kubectl = "1.32"
+helm = "3.17"
+awscli = "latest"
+java = "21" #"temurin-21"   # Flink UDF
+maven = "3.9"
+python = "3.13"
+uv = "latest"
+pre-commit = "latest"
+fnox = "latest"
+git-cliff = "latest"
+# Not in mise's core registry: installed from GitHub releases.
+"github:confluentinc/cli" = "4"
+"github:betterleaks/betterleaks" = "1"

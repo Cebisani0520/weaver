@@ -1,0 +1,76 @@
+[changelog]
+header = "# Changelog\n"
+trim = true
+body = """
+{% if version %}\
+    ## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+{% else %}\
+    ## [unreleased]
+{% endif %}\
+{% for entry in commits | commit_groups(groups=commit_parsers_groups) %}
+    ### {{ entry.group | striptags | trim | upper_first }}
+    {% for commit in entry.commits %}
+        - {% if commit.scope %}*({{ commit.scope }})* {% endif %}\
+            {% if commit.breaking %}[**breaking**] {% endif %}\
+            {{ commit.message | upper_first }}{% if commit.body %}
+{{ commit.body | indent(prefix="  ") }}{% endif %}
+    {% endfor %}
+{% endfor %}
+"""
+
+[git]
+conventional_commits = true
+filter_unconventional = false
+fail_on_unmatched_commit = true
+protect_breaking_commits = true
+tag_pattern = "v[0-9].*"
+ignore_tags = "v.*-rc.*"
+sort_commits = "oldest"
+
+commit_parsers = [
+  # 1. Held-back originals: add one line per commit you hold back (Section 5.3)
+  # { sha = "<original-commit-sha>", skip = true },
+
+  # 2. Conventional commit types
+  { message = "^feat", group = "<!-- 0 -->🚀 Features" },
+  { message = "^fix", group = "<!-- 1 -->🐛 Bug Fixes" },
+  { message = "^doc", group = "<!-- 3 -->📚 Documentation" },
+  { message = "^perf", group = "<!-- 4 -->⚡ Performance" },
+  { message = "^refactor", group = "<!-- 2 -->🚜 Refactor" },
+  { message = "^style", group = "<!-- 5 -->🎨 Styling" },
+  { message = "^test", group = "<!-- 6 -->🧪 Testing" },
+  { message = "^chore\\(release\\): prepare for", skip = true },
+  { message = "^chore\\(deps.*\\)", skip = true },
+  { message = "^chore\\(pr\\)", skip = true },
+  { message = "^chore\\(pull\\)", skip = true },
+  { message = "^chore|^ci", group = "<!-- 7 -->⚙️ Miscellaneous Tasks" },
+  { body = ".*security", group = "<!-- 8 -->🛡️ Security" },
+  { message = "^revert", group = "<!-- 9 -->◀️ Revert" },
+
+  # 3. Process commits (skipped on purpose) — Section 4b of the release guide
+  # Release merge, back-merge, sync from develop, changelog commit
+  { message = "^[Bb]ack[-\\s]?merge", skip = true },
+  { message = "^[a-z]+\\(release\\)", skip = true },
+  { message = "^Initial commit$", skip = true },
+
+  # 4. Platform merge commits (skipped on purpose)
+  # Bitbucket: "Merged in branch-name (pull request #N)"
+  { message = "^Merged?\\b", skip = true },
+  # GitHub: "Merge pull request #N from user/branch"
+  { message = "^Merge pull request", skip = true },
+  # GitLab: "Merge branch 'source' into 'target'"
+  { message = "^Merge branch", skip = true },
+  # Generic git: "Merge remote-tracking branch 'origin/branch'"
+  { message = "^Merge remote-tracking", skip = true },
+  # Generic git: "Merge tag 'vX.Y.Z'"
+  { message = "^Merge tag", skip = true },
+
+  # 5. Catch-all: groups all other commits (legacy, untagged, etc.)
+  { message = ".*", group = "<!-- 10 -->💼 Other" },
+]
+
+[bump]
+features_always_bump_minor = true
+breaking_always_bump_major = true
+initial_tag = "v1.0.0"
+no_increment_regex = "docs|chore|refactor|release"
