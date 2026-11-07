@@ -7,6 +7,7 @@ module "this" {
   collection_path   = "/cmf/api/v1/environments/${var.environment}/statements"
   resource_path     = "/cmf/api/v1/environments/${var.environment}/statements/${var.name}"
   replace_on_change = true
+  replace_triggers  = var.replace_triggers
 
   body = jsonencode({
     apiVersion = "cmf.confluent.io/v1"

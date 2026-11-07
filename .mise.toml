@@ -65,6 +65,7 @@ run = "scripts/cmf_port_forward.sh"
 description = "Apply an environment root: local, npr or prod"
 usage = 'arg "<env>" help="local, npr or prod"'
 run = """
+#!/usr/bin/env bash
 set -euo pipefail
 dir="infra/environments/${usage_env}"
 terraform -chdir="$dir" init -input=false

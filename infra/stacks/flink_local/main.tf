@@ -42,6 +42,24 @@ module "compute_pool" {
   task_manager        = var.compute_pool.task_manager
 }
 
+# DDL first, such as watermark changes on the inferred tables. ALTER TABLE
+# does not affect running statements, so the statements below restart
+# whenever any DDL changes.
+module "ddl" {
+  source   = "../../modules/cmf_statement"
+  for_each = var.ddl_statements
+
+  base_url            = var.cmf_url
+  environment         = module.environment.name
+  name                = each.key
+  sql                 = each.value
+  compute_pool        = module.compute_pool.name
+  catalog             = module.catalog.name
+  database            = module.database.name
+  flink_configuration = var.statement_defaults
+  ok_phases           = ["COMPLETED"]
+}
+
 module "statements" {
   source   = "../../modules/cmf_statement"
   for_each = var.statements
@@ -55,4 +73,7 @@ module "statements" {
   database            = module.database.name
   parallelism         = each.value.parallelism
   flink_configuration = merge(var.statement_defaults, each.value.flink_configuration)
+  replace_triggers    = [sha256(jsonencode(var.ddl_statements))]
+
+  depends_on = [module.ddl]
 }

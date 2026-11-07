@@ -21,6 +21,16 @@ locals {
     "${dirname(file_name)}-${trimsuffix(basename(file_name), ".avsc")}" => file("${path.module}/schemas/${file_name}")
   }
 
+  # Watermark delay on the source tables. CMF's default allows no lateness, so
+  # an event read a few milliseconds after a newer one on another partition is
+  # dropped. The delay is also the minimum latency of every event-time feature.
+  watermark_delay_ms = 1000
+  watermarked_tables = ["transactions", "account-events"]
+  ddl_statements = {
+    for table in local.watermarked_tables :
+    "watermark-${table}" => "ALTER TABLE `${table}` MODIFY WATERMARK FOR `$rowtime` AS `$rowtime` - INTERVAL '${local.watermark_delay_ms / 1000}' SECOND;"
+  }
+
   # Flink statements per use case. The SQL files are shared with npr and prod.
   statements = {
     "fraud-score-features-v1" = {

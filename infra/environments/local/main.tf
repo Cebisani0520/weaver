@@ -15,8 +15,9 @@ module "confluent_local" {
 module "flink_local" {
   source = "../../stacks/flink_local"
 
-  cmf_url    = var.cmf_url
-  statements = local.statements
+  cmf_url        = var.cmf_url
+  ddl_statements = local.ddl_statements
+  statements     = local.statements
 
   # Statements read topics whose tables are inferred from registered schemas.
   depends_on = [module.confluent_local]

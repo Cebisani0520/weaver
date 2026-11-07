@@ -24,6 +24,12 @@ variable "replace_on_change" {
   default     = false
 }
 
+variable "replace_triggers" {
+  description = "Extra values that replace the resource when they change, for example DDL a statement depends on."
+  type        = list(string)
+  default     = []
+}
+
 variable "update_method" {
   description = "How a changed body is applied: PUT to the resource path, POST to the collection, or NONE."
   type        = string

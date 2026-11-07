@@ -63,6 +63,12 @@ variable "statement_defaults" {
   }
 }
 
+variable "ddl_statements" {
+  description = "DDL statements by name, run before the streaming statements (for example ALTER TABLE ... MODIFY WATERMARK)."
+  type        = map(string)
+  default     = {}
+}
+
 variable "statements" {
   description = "Statements by name. Changing a statement's SQL replaces its job."
   type = map(object({

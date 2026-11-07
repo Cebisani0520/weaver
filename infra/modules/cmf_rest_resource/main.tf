@@ -11,6 +11,7 @@ resource "terraform_data" "resource" {
   triggers_replace = concat(
     [var.base_url, var.resource_path],
     var.replace_on_change ? [sha256(var.body)] : [],
+    var.replace_triggers,
   )
 
   input = {

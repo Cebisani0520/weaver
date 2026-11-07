@@ -19,6 +19,7 @@ output "flink" {
     environment  = module.flink_local.environment
     catalog      = module.flink_local.catalog
     compute_pool = module.flink_local.compute_pool
+    ddl          = module.flink_local.ddl_statements
     statements   = module.flink_local.statements
   }
 }

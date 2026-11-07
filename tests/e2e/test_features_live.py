@@ -119,7 +119,19 @@ def test_live_features_match_the_reference() -> None:
         kafka.close()
 
     missing = sent - rows.keys()
-    assert not missing, f"{len(missing)} of {len(sent)} transactions have no features yet"
+    if missing:
+        times = {
+            e.transaction_id: e.event_time for e in record.events if isinstance(e, Transaction)
+        }
+        last = max(times.values())
+        lines = []
+        for tid in sorted(missing, key=times.__getitem__):
+            before = (last - times[tid]).total_seconds()
+            lines.append(f"  {tid} at {times[tid].isoformat()} ({before:.1f}s before the last)")
+        pytest.fail(
+            f"{len(missing)} of {len(sent)} transactions have no features. Late events dropped "
+            "by the watermark, or still behind it:\n" + "\n".join(lines)
+        )
 
     mismatches = []
     for tid, want in expected.items():

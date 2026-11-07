@@ -45,6 +45,12 @@ variable "flink_configuration" {
   default     = {}
 }
 
+variable "replace_triggers" {
+  description = "Values that restart the statement when they change, such as the DDL its tables depend on."
+  type        = list(string)
+  default     = []
+}
+
 variable "ok_phases" {
   description = "Phases that count as success: RUNNING for streaming statements, COMPLETED for DDL."
   type        = list(string)

@@ -25,6 +25,7 @@
 | flink\_configuration | Flink configuration for this statement, merged over the pool's. Streaming INSERTs need execution.checkpointing.interval. | `map(string)` | `{}` | no |
 | ok\_phases | Phases that count as success: RUNNING for streaming statements, COMPLETED for DDL. | `list(string)` | <pre>[<br/>  "RUNNING",<br/>  "COMPLETED"<br/>]</pre> | no |
 | parallelism | Statement parallelism. | `number` | `1` | no |
+| replace\_triggers | Values that restart the statement when they change, such as the DDL its tables depend on. | `list(string)` | `[]` | no |
 | wait\_seconds | Seconds to wait for the statement to reach an ok phase. The first run pulls the Flink SQL image. | `number` | `900` | no |
 
 ## Outputs

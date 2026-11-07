@@ -12,6 +12,7 @@
 | catalog | ../../modules/cmf_kafka_catalog | n/a |
 | compute\_pool | ../../modules/cmf_compute_pool | n/a |
 | database | ../../modules/cmf_kafka_database | n/a |
+| ddl | ../../modules/cmf_statement | n/a |
 | environment | ../../modules/cmf_environment | n/a |
 | statements | ../../modules/cmf_statement | n/a |
 
@@ -24,6 +25,7 @@
 | cmf\_url | CMF REST API as seen from the machine running Terraform (scripts/with\_cmf.sh port-forwards it). | `string` | `"http://localhost:8080"` | no |
 | compute\_pool | The compute pool every statement runs on. | <pre>object({<br/>    name                = optional(string, "default")<br/>    flink_version       = optional(string, "v2_3")<br/>    image               = optional(string, "confluentinc/cp-flink-sql:2.3-cmf2.5-cp1")<br/>    flink_configuration = optional(map(string), {})<br/>    job_manager         = optional(object({ cpu = number, memory = string }), { cpu = 0.5, memory = "1024m" })<br/>    task_manager        = optional(object({ cpu = number, memory = string }), { cpu = 0.5, memory = "1536m" })<br/>  })</pre> | `{}` | no |
 | database\_name | Kafka database name; tables are `<catalog>`.`<database>`.`<topic>`. | `string` | `"local"` | no |
+| ddl\_statements | DDL statements by name, run before the streaming statements (for example ALTER TABLE ... MODIFY WATERMARK). | `map(string)` | `{}` | no |
 | environment\_name | CMF environment for Weaver's statements. | `string` | `"weaver-local"` | no |
 | kubernetes\_namespace | Namespace the environment's Flink clusters run in. | `string` | `"default"` | no |
 | schema\_registry\_url | Schema Registry URL as seen from Flink pods. | `string` | `"http://schema-registry:8081"` | no |
@@ -36,6 +38,7 @@
 | ---- | ----------- |
 | catalog | Catalog and database that expose the Kafka topics as tables. |
 | compute\_pool | Compute pool name. |
+| ddl\_statements | DDL statement names. |
 | environment | CMF environment name. |
 | statements | Running statement names. |
 <!-- END_TF_DOCS -->

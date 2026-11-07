@@ -1,8 +1,9 @@
 -- Fraud features, one row per transaction, written to `txn-features`.
 --
 -- Event time is `$rowtime`, the Kafka record timestamp, which producers set to
--- the event's event_time. The default CMF watermark has no lateness allowance,
--- so events must arrive in order per customer (they do: the key is the customer).
+-- the event's event_time. The environment root sets the source tables'
+-- watermark to `$rowtime` minus a short delay (watermark_delay_ms), so an event
+-- read just after a newer one on another partition is not dropped as late.
 --
 -- Flink requires every OVER aggregate in one SELECT to use the same window, so
 -- each window is its own CTE. The CTEs are re-joined per transaction with

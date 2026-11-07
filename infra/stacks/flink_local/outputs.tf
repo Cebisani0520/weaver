@@ -13,6 +13,11 @@ output "compute_pool" {
   value       = module.compute_pool.name
 }
 
+output "ddl_statements" {
+  description = "DDL statement names."
+  value       = [for s in module.ddl : s.name]
+}
+
 output "statements" {
   description = "Running statement names."
   value       = [for s in module.statements : s.name]
