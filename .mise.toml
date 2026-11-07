@@ -32,9 +32,10 @@ KUBECONFIG = "{{config_root}}/.kube/weaver"
 FLINK_NAMESPACE = "default"
 # AWS_* variables are deliberately NOT set here, so a shell in this repo never
 # points real AWS tooling at Floci by accident. Use `mise run floci-env`.
+#_.python.venv = ".venv"
 
 [tasks.up]
-description = "Start the local runtime (Floci, Kafka, Schema Registry, Kafka UI, kind + CMF) and prove the local root"
+description = "Start the local runtime (Floci, Kafka, Schema Registry, Kafka UI, kind + CMF), then apply the local root"
 run = [
   "terraform -chdir=infra/environments/local/runtime init -input=false",
   # The cluster first: the Helm provider reads the kubeconfig it writes.
@@ -44,7 +45,8 @@ run = [
   "terraform -chdir=infra/environments/local/runtime apply -input=false -auto-approve",
   "scripts/wait_for_local.sh",
   "terraform -chdir=infra/environments/local init -input=false -reconfigure",
-  "terraform -chdir=infra/environments/local apply -input=false -auto-approve",
+  # Topics, schemas and Flink statements; the CMF modules need its REST API.
+  "scripts/with_cmf.sh terraform -chdir=infra/environments/local apply -input=false -auto-approve",
 ]
 
 [tasks.status]
@@ -62,15 +64,21 @@ run = "scripts/cmf_port_forward.sh"
 [tasks.deploy]
 description = "Apply an environment root: local, npr or prod"
 usage = 'arg "<env>" help="local, npr or prod"'
-run = [
-  "terraform -chdir=infra/environments/${usage_env} init -input=false",
-  "terraform -chdir=infra/environments/${usage_env} apply -input=false",
-]
+run = """
+set -euo pipefail
+dir="infra/environments/${usage_env}"
+terraform -chdir="$dir" init -input=false
+if [ "${usage_env}" = local ]; then
+  scripts/with_cmf.sh terraform -chdir="$dir" apply -input=false
+else
+  terraform -chdir="$dir" apply -input=false
+fi
+"""
 
 [tasks.down]
 description = "Destroy the local environment root, then the local runtime"
 run = [
-  "terraform -chdir=infra/environments/local destroy -input=false -auto-approve || true",
+  "scripts/with_cmf.sh terraform -chdir=infra/environments/local destroy -input=false -auto-approve || true",
   # Containers Floci started itself (floci-ui, later SageMaker containers) would
   # otherwise keep the network from being deleted.
   "scripts/cleanup_network_containers.sh",
@@ -89,6 +97,28 @@ echo 'export AWS_SECRET_ACCESS_KEY=test'
 [tasks.test]
 description = "Unit tests, plus integration tests when the local runtime is up"
 run = "uv run pytest"
+
+[tasks.test-flink]
+description = "Run the Flink SQL statements on a local PyFlink against the reference features (needs Java 17+)"
+# PyFlink 2.3 matches the pool's Flink 2.3 image. It supports Python up to 3.12, so it
+# runs in its own uvx environment; the project itself stays on 3.13.
+run = "uvx --python 3.12 --with 'apache-flink==2.3.0' --with pytest pytest -p no:cacheprovider -m flink tests/flink"
+
+[tasks.gate2]
+description = "Gate 2: live events through Kafka and CMF produce the reference features"
+run = "uv run pytest -m e2e tests/e2e -v"
+
+[tasks.feed]
+description = "Send live synthetic payments to Kafka (extra args go to the generator, e.g. -- --rate 20 --live 300)"
+run = "uv run python -m services.generators.transactions --output kafka --live 600 --rate 10"
+
+[tasks.takeover]
+description = "Play the account-takeover scenario over live traffic (17 minutes compressed to 17 seconds)"
+run = "uv run python -m services.generators.transactions --output kafka --live 60 --rate 10 --scenario account-takeover --id-prefix demo-$(date +%s)-"
+
+[tasks.features]
+description = "Tail txn-features with the Avro console consumer inside the Schema Registry container"
+run = "docker exec -it schema-registry kafka-avro-console-consumer --bootstrap-server broker:29092 --topic txn-features --property schema.registry.url=http://localhost:8081"
 
 [tasks.lint]
 description = "Every pre-commit hook against every file"
