@@ -1,0 +1,14 @@
+{
+  "type": "record",
+  "name": "AccountEvent",
+  "namespace": "io.weaver.accounts",
+  "doc": "A security-relevant change on a customer's account or channel.",
+  "fields": [
+    {"name": "event_id", "type": "string", "doc": "Unique event ID."},
+    {"name": "event_time", "type": {"type": "long", "logicalType": "timestamp-millis"}, "doc": "When the change happened, UTC. Also the Kafka record timestamp."},
+    {"name": "customer_id", "type": "string", "doc": "Hashed customer ID. Also the message key."},
+    {"name": "event_type", "type": "string", "doc": "SIM_SWAP, NEW_DEVICE_LOGIN, BENEFICIARY_ADDED or PASSWORD_RESET."},
+    {"name": "device_id", "type": ["null", "string"], "default": null, "doc": "Hashed device ID, for NEW_DEVICE_LOGIN."},
+    {"name": "beneficiary_id", "type": ["null", "string"], "default": null, "doc": "Hashed beneficiary ID, for BENEFICIARY_ADDED."}
+  ]
+}

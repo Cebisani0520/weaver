@@ -36,3 +36,10 @@ provider "aws" {
     tags = local.tags
   }
 }
+
+# The local broker's host listener. No TLS or SASL locally; npr and prod use
+# the confluent provider with service-account API keys instead.
+provider "kafka" {
+  bootstrap_servers = [var.kafka_bootstrap_servers]
+  tls_enabled       = false
+}

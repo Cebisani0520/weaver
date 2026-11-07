@@ -3,8 +3,9 @@ confluent_platform_version = "8.0.0"
 kind_node_image            = "kindest/node:v1.37.0"
 
 # Pin flink_operator and cmf after the first successful install:
-#   helm repo add confluentinc https://packages.confluent.io/helm
-#   helm search repo confluentinc --versions
+# Chart versions, pinned. When one changes, update the image tags in
+# scripts/preload_kind_images.sh (and the compute pool image for a new CMF minor).
+
 chart_versions = {
   cert_manager   = "v1.21.3"
   flink_operator = "1.161.1" # image flink-kubernetes-operator-1.161.1

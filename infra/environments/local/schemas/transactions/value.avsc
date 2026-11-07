@@ -1,0 +1,20 @@
+{
+  "type": "record",
+  "name": "Transaction",
+  "namespace": "io.weaver.payments",
+  "doc": "A completed payment. Published by the payment platform after processing. All IDs are hashed; amounts are ZAR cents.",
+  "fields": [
+    {"name": "transaction_id", "type": "string", "doc": "Unique payment ID."},
+    {"name": "event_time", "type": {"type": "long", "logicalType": "timestamp-millis"}, "doc": "When the payment was processed, UTC. Also the Kafka record timestamp."},
+    {"name": "customer_id", "type": "string", "doc": "Hashed customer ID. Also the message key."},
+    {"name": "account_id", "type": "string", "doc": "Hashed account ID the payment was made from."},
+    {"name": "device_id", "type": ["null", "string"], "default": null, "doc": "Hashed device ID for app and online payments; null for card-present."},
+    {"name": "channel", "type": "string", "doc": "CARD_PRESENT, CARD_ONLINE, PAYSHAP, EFT or WALLET."},
+    {"name": "amount_cents", "type": "long", "doc": "Amount in ZAR cents."},
+    {"name": "currency", "type": "string", "default": "ZAR", "doc": "ISO 4217 currency code."},
+    {"name": "merchant_category", "type": ["null", "string"], "default": null, "doc": "ISO 18245 merchant category code for card payments."},
+    {"name": "merchant_id", "type": ["null", "string"], "default": null, "doc": "Hashed merchant ID for card payments."},
+    {"name": "beneficiary_id", "type": ["null", "string"], "default": null, "doc": "Hashed beneficiary ID for PayShap and EFT transfers."},
+    {"name": "province", "type": "string", "doc": "Province the payment was made from, as a two-letter code (GP, WC, KZN, ...)."}
+  ]
+}

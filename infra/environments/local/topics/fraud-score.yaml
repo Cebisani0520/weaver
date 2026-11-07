@@ -1,0 +1,37 @@
+# Topics for the fraud-score use case. The same file shape is used in npr and
+# prod; only partition counts and retention differ between environments.
+#
+# Message keys are the hashed customer ID as plain bytes, so one customer's
+# events stay in order on one partition. Only value schemas are registered.
+use_case: fraud-score
+
+topics:
+  transactions:
+    partitions: 6
+    config:
+      cleanup.policy: delete
+      retention.ms: "604800000" # 7 days
+
+  account-events:
+    partitions: 6
+    config:
+      cleanup.policy: delete
+      retention.ms: "604800000"
+
+  txn-features:
+    partitions: 6
+    config:
+      cleanup.policy: delete
+      retention.ms: "604800000"
+
+  fraud-scores:
+    partitions: 6
+    config:
+      cleanup.policy: delete
+      retention.ms: "604800000"
+
+  fraud-alerts:
+    partitions: 6
+    config:
+      cleanup.policy: delete
+      retention.ms: "2592000000" # 30 days: analysts work alerts for longer
