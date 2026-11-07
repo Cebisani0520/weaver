@@ -43,13 +43,28 @@ mise run setup          # uv sync + pre-commit install
 mise run up             # local runtime + local root
 mise run status         # health checks
 mise run smoke          # pods in kind reach broker, schema-registry, floci
+mise run deploy local   # topics, schemas, CMF objects, Flink statements
+mise run takeover       # live traffic + account-takeover scenario
+mise run gate2          # live features vs the reference
 mise run test           # unit (+ integration when the runtime is up)
+mise run test-flink     # Flink SQL on local PyFlink vs the reference
 mise run lint           # all pre-commit hooks
 mise run down           # tear down
 eval "$(mise run floci-env)"   # point the AWS CLI at Floci in this shell
 ```
 
 There is no Terraform binary or registry access in some sandboxes; when that is the case, `mise run test` still checks HCL syntax, module structure and the repo rules.
+
+## Streaming conventions
+
+- **Topics** come from `infra/environments/<env>/topics/*.yaml`, one file per use case. **Schemas** come from `schemas/<topic>/value.avsc` (subject `<topic>-value`). Only value schemas are registered; message keys are the hashed customer ID as plain bytes.
+- **Producers never register schemas.** Terraform owns them; clients use `auto.register.schemas=false` and `use.latest.version=true`.
+- **Event time is the Kafka record timestamp.** Producers set it to the event's `event_time`. CMF's default watermark allows no lateness, so send events in time order per partition.
+- **Flink SQL lives in files** under `services/flink_sql/<use_case>/` and is passed to the `flink_local` stack from `local.statements` in the environment root. A statement's SQL cannot change while it runs: changing it replaces the job. Put a version in the statement name.
+- **Every SQL feature has a plain-Python reference** (`reference_features.py`). `mise run test-flink` runs the SQL file unchanged on a local PyFlink and compares every row; `mise run gate2` does the same against the live stack.
+- **Flink 2.3.** Compute pools run Flink 2.3 (`v2_3`, image `cp-flink-sql:2.3-cmf2.5-cp1`). A pool's Flink version cannot change while it has statements; upgrading means a new pool and new statements, which start with empty state. The pool image, `preload_kind_images.sh` and the PyFlink version in `test-flink` move together.
+- **Python 3.12 compatibility.** `mise run test-flink` imports the generator and `reference_features.py` under PyFlink's Python 3.12. Keep those modules free of 3.13-only syntax.
+- **CMF has no Terraform provider.** The `cmf_*` modules call its REST API through `cmf_rest_resource`; anything that applies the local root runs under `scripts/with_cmf.sh`, which port-forwards CMF.
 
 ## Adding things
 
