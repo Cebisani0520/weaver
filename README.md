@@ -10,8 +10,8 @@ The first use case is **real-time fraud scoring** for a South African fintech. F
 
 | Phase | Scope | Status |
 | --- | --- | --- |
-| Week 1: Foundations | Repo, tooling, local runtime (Floci, Kafka, Schema Registry, Kafka UI, kind + CMF), Floci state backend, health checks, kind network smoke test | **In this repo** |
-| Week 2: Streaming | Topics and Avro schemas, transaction generator, feature statement | Planned |
+| Week 1: Foundations | Repo, tooling, local runtime (Floci, Kafka, Schema Registry, Kafka UI, kind + CMF), Floci state backend, health checks, kind network smoke test | **Done** (Gate 1 met) |
+| Week 2: Streaming | Topics and Avro schemas, transaction generator with the account-takeover scenario, CMF environment, catalog and pool, feature statement writing `txn-features` | **In this repo** |
 | Week 3: Model | Training data, XGBoost image, training job, endpoint, MLflow | Planned |
 | Week 4: Inference | `FRAUD_SCORE` UDF, scoring and decision statements, load test | Planned |
 | Week 5: Harden and demo | Model v2 rollout, dashboard, runbook | Planned |
@@ -318,18 +318,31 @@ mise run test         # unit tests, plus integration tests against the running r
 | Kafka UI | http://localhost:9021 |
 | Floci console | http://localhost:4566/_floci/ui |
 | CMF REST API | `mise run cmf`, then http://localhost:8080 |
-| Flink Web UI | per job, from week 2: `confluent flink statement web-ui-forward ... --url http://localhost:8080` |
+| Flink Web UI | per statement: `confluent flink statement web-ui-forward fraud-score-features-v1 --environment weaver-local --url http://localhost:8080` (with `mise run cmf` running) |
 
 Tear down with `mise run down`. It removes the containers, network, kind cluster, named volumes and the Floci state backend. Pulled images stay in the host Docker cache on purpose: `scripts/preload_kind_images.sh` loads the ~1.5 GB CMF image from there into a fresh kind node, so the next `up` does not download it again.
 
 **Week 1 to-do once the stack is up:** pin the Flink operator and CMF chart versions in `infra/environments/local/runtime/terraform.tfvars` (`helm search repo confluentinc --versions`), and confirm the Confluent developer licence terms for CMF.
 
+### Week 2: streaming features
+
+```bash
+mise run deploy local   # topics, schemas, CMF environment, catalog, compute pool, feature statement
+mise run takeover       # live traffic plus the account-takeover scenario, compressed to 17 seconds
+mise run features       # watch txn-features (Avro console consumer)
+mise run gate2          # Gate 2: live features match the reference implementation
+mise run test-flink     # the same SQL on a local PyFlink 2.3, no cluster needed (Java 17+)
+```
+
+Statements run on **Flink 2.3** (CMF 2.5's `v2_3` pools, image `cp-flink-sql:2.3-cmf2.5-cp1`), which `mise run up` preloads into kind. CMF starts one Flink cluster per statement, so give it a minute to reach `RUNNING`; `deploy` waits for it.
+
+**Event time and ordering.** Tables use CMF's default watermark: the Kafka record timestamp (`$rowtime`) with no lateness allowance. The generator sets the record timestamp to each event's `event_time` and sends one time-ordered stream, keyed by customer, so nothing is late. Back-dated history (`--history-hours`) is only safe on fresh topics: on a partition that already holds newer events it arrives late and Flink drops it.
+
 ### Later weeks
 
 ```bash
 mise run train fraud-score        # week 3: build the model image, run the training job on Floci
-mise run deploy local             # weeks 2-4: topics, schemas, endpoint, Flink statements
-mise run demo fraud-score         # week 5: generator + scripted account-takeover scenario
+mise run demo fraud-score         # week 5: dashboard + scripted demo
 ```
 
 ### Point a shell at Floci
@@ -353,7 +366,12 @@ aws sagemaker list-endpoints
 | `mise run status` | Health of every local component | Now |
 | `mise run smoke` | Network smoke test from a pod in kind | Now |
 | `mise run cmf` | Port-forward the CMF REST API to `localhost:8080` | Now |
-| `mise run deploy <env>` | `init` and `apply` on `infra/environments/<env>` | Now (local) |
+| `mise run deploy <env>` | `init` and `apply` on `infra/environments/<env>` (CMF port-forwarded for `local`) | Now (local) |
+| `mise run feed` | Live synthetic payments to Kafka; extra args go to the generator | Now |
+| `mise run takeover` | Live traffic plus the account-takeover scenario | Now |
+| `mise run features` | Tail `txn-features` | Now |
+| `mise run gate2` | Live features compared with the reference implementation | Now |
+| `mise run test-flink` | Feature SQL on a local PyFlink against the reference | Now |
 | `mise run floci-env` | Prints `AWS_*` exports for Floci: `eval "$(mise run floci-env)"` | Now |
 | `mise run test` | Unit tests; integration tests when the runtime is up | Now |
 | `mise run lint` | Every pre-commit hook on every file | Now |
@@ -467,9 +485,9 @@ The Floci image tag is pinned in `infra/environments/local/runtime/terraform.tfv
 ### Adding a use case
 
 1. `services/models/<use_case>/`: Dockerfile with `train` and `serve`, `pipeline.py`, `evaluate.py`, `MODEL_CARD.md`.
-2. `services/flink_sql/<use_case>/`: `features.sql`, `scoring.sql.tftpl`, decision SQL.
+2. `services/flink_sql/<use_case>/`: `features.sql`, `scoring.sql.tftpl`, decision SQL, and `reference_features.py`, the plain-Python definition the SQL is tested against.
 3. `services/generators/<source>/`: synthetic events and scenarios.
-4. `infra/environments/<env>/topics/<use-case>.yaml` and its schemas.
+4. `infra/environments/<env>/topics/<use-case>.yaml` and `schemas/<topic>/value.avsc`; add the statements to `local.statements` in the environment root.
 5. Register the shared UDF under the use case's name (local) or a `CREATE MODEL` (Cloud). No Java changes.
 
 ---
@@ -478,9 +496,10 @@ The Floci image tag is pinned in `infra/environments/local/runtime/terraform.tfv
 
 | Level | Scope | Runs against |
 | --- | --- | --- |
-| Unit | Model code, feature logic, generator | Python only |
+| Unit | Generator, reference feature definitions, repo rules, Terraform layout | Python only |
+| Flink SQL | `features.sql` unchanged, in streaming mode, against the reference on generated history plus the takeover | Local PyFlink 2.3 (`mise run test-flink`) |
 | Integration | Train → endpoint → invoke | Floci via testcontainers |
-| End to end | Event in → score out; p95 latency | Full local stack |
+| End to end | Gate 2: live events in, `txn-features` out, compared with the reference; later event in → score out and p95 latency | Full local stack (`mise run gate2`) |
 
 **POC success criteria**
 

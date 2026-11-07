@@ -1,0 +1,24 @@
+{
+  "type": "record",
+  "name": "TransactionFeatures",
+  "namespace": "io.weaver.fraud",
+  "doc": "Per-payment fraud features, computed by the Flink feature statement. One record per transaction.",
+  "fields": [
+    {"name": "transaction_id", "type": "string", "doc": "Payment the features belong to."},
+    {"name": "customer_id", "type": "string", "doc": "Hashed customer ID."},
+    {"name": "event_time", "type": {"type": "long", "logicalType": "timestamp-millis"}, "doc": "Payment time, UTC."},
+    {"name": "amount_cents", "type": "long", "doc": "Payment amount in ZAR cents."},
+    {"name": "channel", "type": "string", "doc": "Payment channel."},
+    {"name": "province", "type": "string", "doc": "Province of the payment."},
+    {"name": "txn_count_1h", "type": "long", "doc": "Customer's payments in the last hour, including this one."},
+    {"name": "txn_count_24h", "type": "long", "doc": "Customer's payments in the last 24 hours, including this one."},
+    {"name": "distinct_provinces_24h", "type": "long", "doc": "Distinct provinces the customer paid from in the last 24 hours."},
+    {"name": "avg_amount_30d_cents", "type": "double", "doc": "Customer's mean payment amount over the last 30 days, in cents, including this one."},
+    {"name": "amount_to_avg_30d", "type": "double", "doc": "This amount divided by the 30-day mean."},
+    {"name": "is_new_beneficiary", "type": "boolean", "doc": "The beneficiary was added in the last 24 hours."},
+    {"name": "sim_swap_72h", "type": "boolean", "doc": "The customer had a SIM swap in the last 72 hours."},
+    {"name": "is_new_device", "type": "boolean", "doc": "The payment's device first logged in within the last 24 hours."},
+    {"name": "is_night_sast", "type": "boolean", "doc": "The payment was made between 00:00 and 05:00 SAST."},
+    {"name": "feature_version", "type": "string", "doc": "Version of the feature definitions that produced this record."}
+  ]
+}

@@ -9,6 +9,7 @@ dependencies = []
 [dependency-groups]
 dev = [
   "boto3>=1.35",
+  "confluent-kafka[avro,schemaregistry]>=2.6",
   "mypy>=1.13",
   "pytest>=8.3",
   "python-hcl2>=7.0",
@@ -24,8 +25,9 @@ pythonpath = ["."]
 markers = [
   "integration: needs the local runtime (mise run up)",
   "e2e: needs the full local stack with Flink statements deployed",
+  "flink: runs Flink SQL on a local PyFlink (mise run test-flink)",
 ]
-addopts = "-ra"
+addopts = "-ra -m 'not e2e'"
 
 [tool.ruff]
 line-length = 100
@@ -33,7 +35,9 @@ target-version = "py313"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "SIM", "S", "RUF"]
+# Generators use random for synthetic data, not for security.
+ignore = ["S311"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101"]
+"tests/**" = ["S101", "S608"]
 "conftest.py" = ["S101"]

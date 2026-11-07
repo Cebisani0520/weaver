@@ -18,7 +18,7 @@ set -uo pipefail
 
 CLUSTER="${KIND_CLUSTER_NAME:-weaver}"
 NODE="${CLUSTER}-control-plane"
-read -r -a IMAGES <<< "${KIND_PRELOAD_IMAGES:-confluentinc/cp-cmf:2.5.0 confluentinc/cp-flink-kubernetes-operator:1.16.1-cp1}"
+read -r -a IMAGES <<< "${KIND_PRELOAD_IMAGES:-confluentinc/cp-cmf:2.5.0 confluentinc/cp-flink-kubernetes-operator:1.16.1-cp1 confluentinc/cp-flink-sql:2.3-cmf2.5-cp1}"
 
 case "$(docker exec "$NODE" uname -m)" in
   x86_64 | amd64) PLATFORM="linux/amd64" ;;
