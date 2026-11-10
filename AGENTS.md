@@ -46,6 +46,11 @@ mise run smoke          # pods in kind reach broker, schema-registry, floci
 mise run deploy local   # topics, schemas, CMF objects, Flink statements
 mise run takeover       # live traffic + account-takeover scenario
 mise run gate2          # live features vs the reference
+mise run build-model    # model image -> ECR on Floci
+mise run train          # SageMaker training job on Floci, evaluate, register in MLflow
+mise run models         # registered versions, test metrics, champion
+mise run approve <n>    # release version n, then apply: endpoint fraud-score serves it
+mise run gate3          # the endpoint scores the takeover above normal traffic
 mise run test           # unit (+ integration when the runtime is up)
 mise run test-flink     # Flink SQL on local PyFlink vs the reference
 mise run lint           # all pre-commit hooks
@@ -66,6 +71,16 @@ There is no Terraform binary or registry access in some sandboxes; when that is 
 - **Python 3.12 compatibility.** `mise run test-flink` imports the generator and `reference_features.py` under PyFlink's Python 3.12. Keep those modules free of 3.13-only syntax.
 - **CMF has no Terraform provider.** The `cmf_*` modules call its REST API through `cmf_rest_resource`; anything that applies the local root runs under `scripts/with_cmf.sh`, which port-forwards CMF.
 
+## Model conventions
+
+- **One directory per model** under `services/models/<model>/` (dashes in the model name, underscores in the directory). It holds the container (`Dockerfile`, `requirements.txt`, `bin/train`, `bin/serve`, the `<model>_model` package), `VERSION` (the image tag), `dataset.py` and `pipeline.py`.
+- **Container code runs on Python 3.12** (`python:3.12-slim`) and imports only its own package, numpy and xgboost. Use relative imports inside the package; never import `services.*` from it. The unit tests run it on 3.13, so keep it free of 3.13-only syntax.
+- **The feature spec is the contract.** `feature_spec.json` lists the model's inputs in vector order, named as in the `txn-features` Avro schema. It ships in the image and in every artifact. Changing the inputs is a new model (or a new `feature_version` with new SQL), not a new version of this one.
+- **Training data comes from the reference features**, never from a second implementation, so training and serving cannot skew. Datasets are deterministic for a config and split by time.
+- **Training jobs are runs, not infrastructure.** The pipeline creates them; Terraform owns buckets, ECR repositories, the SageMaker role and the endpoint.
+- **Release = approved version.** `pipeline approve` copies the training artifact to `s3://<prefix>-models/<model>/v<N>/model.tar.gz` with `model_version.json` added, moves the MLflow `champion` alias and writes `models.auto.tfvars.json` in the environment root. Terraform then creates model and endpoint config `<model>-v<N>` and updates the stable endpoint `<model>`. The local file is git-ignored; npr and prod commit theirs through a pull request. A version is immutable: a new image or artifact is a new version.
+- **Floci unknowns are handled in code, not assumed.** The server loads an extracted artifact or a `model.tar.gz`, and reads its version from `model_version.json` rather than relying on the endpoint's `Environment`.
+
 ## Adding things
 
 - **A resource:** add or extend a module in `infra/modules`, then call it from a stack.
@@ -76,6 +91,6 @@ There is no Terraform binary or registry access in some sandboxes; when that is 
 ## Conventions
 
 - Region `eu-west-1` everywhere, including Floci.
-- Container names double as hostnames on the `weaver` network: `floci`, `broker`, `schema-registry`, `kafka-ui`.
+- Container names double as hostnames on the `weaver` network: `floci`, `broker`, `schema-registry`, `kafka-ui`, `mlflow`.
 - Host ports bind to `127.0.0.1` only.
 - Python 3.13, `uv`, `ruff`, `mypy --strict`. Scripts are run as modules: `python -m scripts.<name>`.
