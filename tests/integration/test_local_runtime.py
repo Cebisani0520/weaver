@@ -15,6 +15,7 @@ import pytest
 
 FLOCI = "http://localhost:4566"
 SCHEMA_REGISTRY = "http://localhost:8081"
+MLFLOW = "http://localhost:5050"
 
 
 def _listening(host: str, port: int) -> bool:
@@ -66,3 +67,21 @@ def test_kafka_listener_is_open() -> None:
 
 def test_schema_registry_answers() -> None:
     assert isinstance(_get_json(f"{SCHEMA_REGISTRY}/subjects"), list)
+
+
+def test_mlflow_answers() -> None:
+    with urllib.request.urlopen(f"{MLFLOW}/health", timeout=5) as response:  # noqa: S310
+        assert response.status == 200
+
+
+def test_ml_stack_is_applied(floci_session: boto3.session.Session) -> None:
+    """Buckets, image repository and SageMaker role from the ml stack (week 3)."""
+    s3 = floci_session.client("s3", endpoint_url=FLOCI)
+    for bucket in ("weaver-data", "weaver-models"):
+        s3.head_bucket(Bucket=bucket)
+    ecr = floci_session.client("ecr", endpoint_url=FLOCI)
+    repository = ecr.describe_repositories(repositoryNames=["weaver/fraud-score"])
+    # Path style (FLOCI_SERVICES_ECR_URI_STYLE=path), which Docker can push to.
+    assert repository["repositories"][0]["repositoryUri"].startswith("localhost:4566/")
+    iam = floci_session.client("iam", endpoint_url=FLOCI)
+    assert iam.get_role(RoleName="weaver-sagemaker-exec")["Role"]["Arn"]

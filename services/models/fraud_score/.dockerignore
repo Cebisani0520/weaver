@@ -1,0 +1,6 @@
+*
+!bin/
+!fraud_score_model/
+!requirements.txt
+!VERSION
+**/__pycache__

@@ -40,3 +40,8 @@ variable "kafka_ui_enabled" {
   type        = bool
   default     = true
 }
+
+variable "mlflow_image" {
+  description = "MLflow image, pinned."
+  type        = string
+}

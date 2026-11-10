@@ -1,0 +1,3 @@
+#!/bin/sh
+# SageMaker runs `serve` for an endpoint.
+exec python -m fraud_score_model.serve "$@"

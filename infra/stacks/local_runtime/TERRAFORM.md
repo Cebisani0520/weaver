@@ -22,6 +22,8 @@
 | floci\_ready | ../../modules/local_wait | n/a |
 | kafka\_ui | ../../modules/docker_container | n/a |
 | kind | ../../modules/kind_cluster | n/a |
+| mlflow | ../../modules/docker_container | n/a |
+| mlflow\_ready | ../../modules/local_wait | n/a |
 | network | ../../modules/docker_network | n/a |
 | schema\_registry | ../../modules/docker_container | n/a |
 | schema\_registry\_ready | ../../modules/local_wait | n/a |
@@ -44,8 +46,10 @@
 | kafka\_ui\_image | Kafka UI image, pinned. | `string` | `"kafbat/kafka-ui:v1.5.0"` | no |
 | kind\_cluster\_name | Name of the kind cluster that runs CMF. | `string` | `"weaver"` | no |
 | kind\_node\_image | kindest/node image, pinned. | `string` | `"kindest/node:v1.37.0"` | no |
+| mlflow\_enabled | Run the MLflow tracking server and model registry. | `bool` | `true` | no |
+| mlflow\_image | MLflow image, pinned. Keep its version in step with mlflow-skinny in pyproject.toml. | `string` | `"ghcr.io/mlflow/mlflow:v3.18.0"` | no |
 | network\_name | Docker network shared by every local container and the kind node. | `string` | `"weaver"` | no |
-| ports | Host ports, all bound to 127.0.0.1. | <pre>object({<br/>    floci           = optional(number, 4566)<br/>    kafka           = optional(number, 9092)<br/>    schema_registry = optional(number, 8081)<br/>    kafka_ui        = optional(number, 9021)<br/>  })</pre> | `{}` | no |
+| ports | Host ports, all bound to 127.0.0.1. | <pre>object({<br/>    floci           = optional(number, 4566)<br/>    kafka           = optional(number, 9092)<br/>    schema_registry = optional(number, 8081)<br/>    kafka_ui        = optional(number, 9021)<br/>    mlflow          = optional(number, 5050)<br/>  })</pre> | `{}` | no |
 | tags | Tags applied to AWS resources. | `map(string)` | `{}` | no |
 | tf\_lock\_table | Floci DynamoDB table used for state locking. | `string` | `"weaver-tflock"` | no |
 | tf\_state\_bucket | Floci S3 bucket holding state for the other local roots. | `string` | `"weaver-tfstate"` | no |

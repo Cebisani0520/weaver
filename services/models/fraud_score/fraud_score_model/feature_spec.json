@@ -1,0 +1,18 @@
+{
+  "model": "fraud-score",
+  "feature_version": "v1",
+  "doc": "Model inputs, in vector order. Names match the txn-features Avro fields. The Flink invoker (week 4) sends these fields; the container turns them into the vector. Changing this list is a new model, not a new version of this one.",
+  "features": [
+    {"name": "amount_cents", "kind": "numeric"},
+    {"name": "txn_count_1h", "kind": "numeric"},
+    {"name": "txn_count_24h", "kind": "numeric"},
+    {"name": "distinct_provinces_24h", "kind": "numeric"},
+    {"name": "avg_amount_30d_cents", "kind": "numeric"},
+    {"name": "amount_to_avg_30d", "kind": "numeric"},
+    {"name": "is_new_beneficiary", "kind": "boolean"},
+    {"name": "sim_swap_72h", "kind": "boolean"},
+    {"name": "is_new_device", "kind": "boolean"},
+    {"name": "is_night_sast", "kind": "boolean"},
+    {"name": "channel", "kind": "categorical", "values": ["CARD_PRESENT", "CARD_ONLINE", "PAYSHAP", "EFT", "WALLET"]}
+  ]
+}

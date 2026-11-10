@@ -1,0 +1,3 @@
+#!/bin/sh
+# SageMaker runs `train` for a training job.
+exec python -m fraud_score_model.train "$@"

@@ -46,6 +46,18 @@ variable "kafka_ui_image" {
   default     = "kafbat/kafka-ui:v1.5.0"
 }
 
+variable "mlflow_enabled" {
+  description = "Run the MLflow tracking server and model registry."
+  type        = bool
+  default     = true
+}
+
+variable "mlflow_image" {
+  description = "MLflow image, pinned. Keep its version in step with mlflow-skinny in pyproject.toml."
+  type        = string
+  default     = "ghcr.io/mlflow/mlflow:v3.18.0"
+}
+
 variable "kind_cluster_name" {
   description = "Name of the kind cluster that runs CMF."
   type        = string
@@ -86,6 +98,7 @@ variable "ports" {
     kafka           = optional(number, 9092)
     schema_registry = optional(number, 8081)
     kafka_ui        = optional(number, 9021)
+    mlflow          = optional(number, 5050)
   })
   default = {}
 }

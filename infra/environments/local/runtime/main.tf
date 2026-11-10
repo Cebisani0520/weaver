@@ -8,5 +8,6 @@ module "runtime" {
   kubeconfig_path            = local.kubeconfig_path
   chart_versions             = var.chart_versions
   kafka_ui_enabled           = var.kafka_ui_enabled
+  mlflow_image               = var.mlflow_image
   tags                       = local.tags
 }
