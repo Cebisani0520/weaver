@@ -100,3 +100,10 @@ package-lock.json
 # **/build/
 
 .kube/
+
+# Locally approved model versions: they point at the local MLflow registry,
+# which a fresh clone does not have. npr and prod commit theirs.
+infra/environments/local/models.auto.tfvars.json
+
+# Generated training data (rebuilt from a seed by the pipeline)
+data/
