@@ -20,6 +20,7 @@ output "endpoints" {
       network = "http://${module.schema_registry.name}:8081"
     }
     kafka_ui = var.kafka_ui_enabled ? "http://localhost:${var.ports.kafka_ui}" : null
+    mlflow   = var.mlflow_enabled ? "http://localhost:${var.ports.mlflow}" : null
   }
 }
 

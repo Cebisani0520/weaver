@@ -21,3 +21,12 @@ variable "cmf_url" {
   type        = string
   default     = "http://localhost:8080"
 }
+
+variable "models" {
+  description = "Released models: name => version and image tag. `mise run approve` writes models.auto.tfvars.json (git-ignored locally)."
+  type = map(object({
+    version   = number
+    image_tag = string
+  }))
+  default = {}
+}

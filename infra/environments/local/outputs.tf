@@ -23,3 +23,14 @@ output "flink" {
     statements   = module.flink_local.statements
   }
 }
+
+output "ml" {
+  description = "Buckets, image repositories, the SageMaker role and deployed endpoints."
+  value = {
+    data_bucket        = module.ml.data_bucket
+    models_bucket      = module.ml.models_bucket
+    ecr_repositories   = module.ml.ecr_repositories
+    sagemaker_role_arn = module.ml.sagemaker_role_arn
+    endpoints          = module.ml.endpoints
+  }
+}

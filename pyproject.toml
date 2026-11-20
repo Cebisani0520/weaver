@@ -10,10 +10,15 @@ dependencies = []
 dev = [
   "boto3>=1.35",
   "confluent-kafka[avro,schemaregistry]>=2.6",
+  # Client for the local MLflow server; keep the minor in step with mlflow_image.
+  "mlflow-skinny>=3.18,<3.19",
+  # Same versions as services/models/fraud_score/requirements.txt (the container).
+  "numpy==2.5.3",
   "mypy>=1.13",
   "pytest>=8.3",
   "python-hcl2>=7.0",
   "ruff>=0.8",
+  "xgboost-cpu==3.4.1",
 ]
 
 [tool.uv]

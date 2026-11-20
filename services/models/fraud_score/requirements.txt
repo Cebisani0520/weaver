@@ -1,0 +1,5 @@
+# Container dependencies, pinned. Keep in step with the dev group in pyproject.toml
+# so the unit tests exercise the same versions.
+numpy==2.5.3
+scipy==1.18.1
+xgboost-cpu==3.4.1

@@ -11,8 +11,8 @@ The first use case is **real-time fraud scoring** for a South African fintech. F
 | Phase | Scope | Status |
 | --- | --- | --- |
 | Week 1: Foundations | Repo, tooling, local runtime (Floci, Kafka, Schema Registry, Kafka UI, kind + CMF), Floci state backend, health checks, kind network smoke test | **Done** (Gate 1 met) |
-| Week 2: Streaming | Topics and Avro schemas, transaction generator with the account-takeover scenario, CMF environment, catalog and pool, feature statement writing `txn-features` | **In this repo** |
-| Week 3: Model | Training data, XGBoost image, training job, endpoint, MLflow | Planned |
+| Week 2: Streaming | Topics and Avro schemas, transaction generator with the account-takeover scenario, CMF environment, catalog and pool, feature statement writing `txn-features` | **Done** (Gate 2 met) |
+| Week 3: Model | Labelled training data, XGBoost image, training job on Floci, MLflow tracking and registry, approval, endpoint | **In this repo** |
 | Week 4: Inference | `FRAUD_SCORE` UDF, scoring and decision statements, load test | Planned |
 | Week 5: Harden and demo | Model v2 rollout, dashboard, runbook | Planned |
 
@@ -21,6 +21,7 @@ The first use case is **real-time fraud scoring** for a South African fintech. F
 ## Contents
 
 - [Build status](#build-status)
+
 - [How it works](#how-it-works)
 - [Architecture: local POC](#architecture-local-poc)
 - [Architecture: AWS and Confluent Cloud](#architecture-aws-and-confluent-cloud)
@@ -93,25 +94,27 @@ flowchart LR
 
     subgraph FLOCI["Floci (localhost:4566)"]
         S3[("S3<br/>weaver-data, weaver-models")]
-        GLUE["Glue catalog + Athena<br/>Iceberg feature table"]
-        ECR["ECR<br/>model image"]
+        GLUE["Glue catalog + Athena<br/>Iceberg feature table (planned)"]
+        ECR["ECR<br/>weaver/fraud-score"]
         TRAIN["SageMaker training job"]
-        EP["SageMaker endpoint<br/>fraud-score-v1"]
+        EP["SageMaker endpoint fraud-score<br/>config fraud-score-v&lt;N&gt;"]
     end
 
-    MLF["MLflow<br/>(open source)"]
+    DS["Dataset builder<br/>generator + reference features"]
+    MLF["MLflow<br/>tracking + registry"]
 
     GEN --> TIN --> FEAT --> TFEAT --> SCORE
     SR -. schemas .-> FEAT
     SCORE -- InvokeEndpoint --> EP
     EP -- score + reason codes --> SCORE
     SCORE --> DEC --> TOUT --> DASH
-    TFEAT -. Iceberg sink .-> S3
-    S3 --> GLUE
-    GLUE -- training set --> TRAIN
-    ECR --> TRAIN --> S3
-    TRAIN -. metrics .-> MLF
-    S3 -- approved model --> EP
+    TFEAT -. Iceberg sink, planned .-> GLUE
+    DS -- train / validation / test CSV --> S3
+    S3 --> TRAIN
+    ECR --> TRAIN -- model.tar.gz --> S3
+    TRAIN -. metrics, version .-> MLF
+    MLF -. approve .-> EP
+    S3 -- released model --> EP
 ```
 
 | Layer | Local implementation | UI |
@@ -119,7 +122,7 @@ flowchart LR
 | Kafka and Schema Registry | Confluent Platform broker (KRaft) and Schema Registry containers | Kafka UI, `localhost:9021` (swap for Control Center if licensed) |
 | Stream processing | Confluent Manager for Apache Flink (CMF) on a kind cluster; Flink SQL statements; Java async UDF | CMF UI and Flink Web UI (port-forward) |
 | AWS | Floci: S3, Glue, Athena, ECR, IAM, Secrets Manager, CloudWatch Logs, SageMaker training and hosting | Floci console, `localhost:4566/_floci/ui` |
-| Experiment tracking | Open-source MLflow container, artefacts in Floci S3 | MLflow UI |
+| Experiment tracking and registry | Open-source MLflow container; SQLite and artefacts on a named volume | MLflow UI, `localhost:5050` |
 | Demo | Fraud dashboard reading `fraud-scores` and `fraud-alerts` | Dashboard |
 
 **Laptop sizing (estimate):** 32 GB RAM and 8 cores recommended, 16 GB minimum. Give Docker at least 10–12 GB.
@@ -250,7 +253,6 @@ weaver/
 │   │   ├── aws_iam · aws_ssm · aws_sns · aws_lambda · ...
 │   │   ├── aws_s3_bucket · aws_ecr_repository · aws_secretsmanager_secret
 │   │   ├── aws_sagemaker_endpoint          # model + endpoint config + endpoint
-│   │   ├── aws_sagemaker_training_job      # wraps scripts/train.py
 │   │   ├── aws_sagemaker_feature_group     # npr
 │   │   ├── aws_sagemaker_model_package_group  # npr
 │   │   ├── aws_sagemaker_pipeline          # npr
@@ -271,11 +273,11 @@ weaver/
 │       └── local_runtime/            # docker network + containers, kind, Helm (CMF), MLflow
 ├── scripts
 │   ├── terraform_docs_staged.sh
-│   ├── train.py                      # CreateTrainingJob (no native Terraform resource)
+│   ├── build_model_image.sh          # model image -> ECR (Floci locally)
 │   └── wait_for_local.sh             # health checks: Floci, broker, SR, CMF
 ├── services
-│   ├── models/fraud_score/           # Dockerfile, train, serve, data_gen, pipeline.py,
-│   │                                 #   evaluate.py, MODEL_CARD.md
+│   ├── models/fraud_score/           # Dockerfile, bin/{train,serve}, fraud_score_model/,
+│   │                                 #   VERSION, dataset.py, pipeline.py, MODEL_CARD.md
 │   ├── flink_udf/                    # Java async UDF calling SageMaker Runtime (local)
 │   ├── flink_sql/fraud_score/        # features.sql, scoring.sql.tftpl, alerts.sql
 │   ├── generators/transactions/      # synthetic ZAR events + fraud scenarios
@@ -338,10 +340,24 @@ Statements run on **Flink 2.3** (CMF 2.5's `v2_3` pools, image `cp-flink-sql:2.3
 
 **Event time and ordering.** Tables use CMF's default watermark: the Kafka record timestamp (`$rowtime`) with no lateness allowance. The generator sets the record timestamp to each event's `event_time` and sends one time-ordered stream, keyed by customer, so nothing is late. Back-dated history (`--history-hours`) is only safe on fresh topics: on a partition that already holds newer events it arrives late and Flink drops it.
 
+### Week 3: the model
+
+```bash
+mise run up             # again: adds MLflow, switches Floci ECR to path-style URIs, applies the ml stack
+mise run build-model    # build services/models/fraud_score, push to ECR on Floci (tag = VERSION)
+mise run train          # dataset to S3, training job on Floci, test-split evaluation, MLflow run + version
+mise run models         # registered versions with test AUC-PR and quality gate
+mise run approve 1      # release version 1, then terraform apply (shows the plan, asks first)
+mise run gate3          # Gate 3: the endpoint scores the takeover journey above every normal payment
+```
+
+The pipeline (`services/models/fraud_score/pipeline.py`) runs on the laptop and talks to Floci and MLflow: it builds the labelled dataset (synthetic, from a seed: normal traffic plus fraud scenarios and benign look-alikes, featurised by the reference implementation, split by time), uploads it to `weaver-data`, creates a SageMaker training job with the model image, waits for it, scores the held-out test split with the serving code and registers the result in MLflow with a `quality_gate` tag (test AUC-PR at least 0.70). `approve` publishes the artifact to `weaver-models/fraud-score/v<N>/` and writes `infra/environments/local/models.auto.tfvars.json`; Terraform turns that into model and endpoint config `fraud-score-v<N>` behind the stable endpoint `fraud-score`. Approving a later version updates the same endpoint.
+
+Training without the cluster: `uv run python -m services.models.fraud_score.dataset` writes the CSVs to `data/`, and `mise run test` trains and serves a small model in-process with the container code.
+
 ### Later weeks
 
 ```bash
-mise run train fraud-score        # week 3: build the model image, run the training job on Floci
 mise run demo fraud-score         # week 5: dashboard + scripted demo
 ```
 
@@ -371,12 +387,17 @@ aws sagemaker list-endpoints
 | `mise run takeover` | Live traffic plus the account-takeover scenario | Now |
 | `mise run features` | Tail `txn-features` | Now |
 | `mise run gate2` | Live features compared with the reference implementation | Now |
+| `mise run build-model [model]` | Model image built and pushed to ECR on Floci | Now |
+| `mise run dataset [model]` | Labelled dataset built and uploaded to S3 | Now |
+| `mise run train [model]` | Training job on Floci, evaluation, MLflow run and registered version | Now |
+| `mise run models [model]` | Registered versions, test metrics, champion | Now |
+| `mise run approve <version>` | Release a version, then apply the local root to deploy it | Now |
+| `mise run gate3` | Endpoint scores, version and latency | Now |
 | `mise run test-flink` | Feature SQL on a local PyFlink against the reference | Now |
 | `mise run floci-env` | Prints `AWS_*` exports for Floci: `eval "$(mise run floci-env)"` | Now |
 | `mise run test` | Unit tests; integration tests when the runtime is up | Now |
 | `mise run lint` | Every pre-commit hook on every file | Now |
 | `mise run down` | Destroys the `local` root, then `local/runtime` | Now |
-| `mise run train <use-case> [env]` | Model image to ECR, then the training pipeline | Week 3 |
 | `mise run demo <use-case>` | Generator and scripted scenario | Week 5 |
 
 `AWS_*` variables are deliberately not set by `.mise.toml`, so a shell in this repo never points real AWS tooling at Floci by accident.
@@ -434,14 +455,15 @@ The target follows AWS's recommended MLOps stack. Floci emulates training jobs, 
 | Capability | AWS target (`npr` / `prod`) | POC |
 | --- | --- | --- |
 | Data lake and catalog | S3 Iceberg tables, Glue Data Catalog, Lake Formation, Athena | Built on Floci (Lake Formation grants stored, not enforced) |
-| Data preparation | SageMaker Processing jobs | Container on the Processing contract, run by a mise task |
+| Data preparation | SageMaker Processing jobs | `dataset.py` on the host: generator plus reference features, CSV to S3, split by time |
 | Offline feature store | Feature Store offline store | Flink sinks `txn-features` to an Iceberg table in Floci S3, registered in Glue |
 | Online feature store | Feature Store online store, Standard tier | Not needed: features travel in the request |
 | Experiment tracking | Managed MLflow, synced to Model Registry | Open-source MLflow container |
 | Training | Training jobs, automatic model tuning | Built on Floci (no tuning jobs) |
-| Orchestration | SageMaker Pipelines | `pipeline.py`, one function per pipeline step |
-| Model registry | Model package group, approval, EventBridge on approval | MLflow `approved` alias |
-| Bias and explainability | SageMaker Clarify | `shap` in the evaluate step; top 3 reason codes per score |
+| Orchestration | SageMaker Pipelines | `pipeline.py`, one function per pipeline step: dataset, train, evaluate, register, approve |
+| Evaluation | Processing job, model quality check step | On the host with the serving code; test split metrics and a quality gate in MLflow |
+| Model registry | Model package group, approval, EventBridge on approval | MLflow registry: one version per training job, `quality_gate` tag, `champion` alias; `approve` writes the version for Terraform |
+| Bias and explainability | SageMaker Clarify | XGBoost SHAP contributions in the container; top 3 reason codes per score |
 | Governance | Model Cards, Model Dashboard, Lineage Tracking | `MODEL_CARD.md`; lineage tags (git SHA, Iceberg snapshot, MLflow run) |
 | Hosting | Real-time endpoint, autoscaling, deployment guardrails | Built on Floci (CPU only, no autoscaling) |
 | Monitoring | Data capture, Model Monitor, CloudWatch alarms | Nightly drift job over `txn-features` and `fraud-scores` |
@@ -461,6 +483,8 @@ Pinned to **Floci 2.4.0** (released 31 October 2026). Not supported in this rele
 | Glue | Job scripts do not run; crawlers do not create tables; schedules do not fire. Data quality rulesets added in 2.4.0, evaluation unverified | Tables registered by Terraform; ETL in Flink or the prepare container |
 | Step Functions | No SageMaker integration | `pipeline.py` |
 | Application Auto Scaling | Policies stored but inert | Single endpoint instance |
+
+**Assumed in week 3, to confirm on Floci 2.4.0.** The code tolerates each case, but the first run settles it: whether training channel files keep their key names (the trainer reads every `*.csv` under a channel); whether an endpoint gets `model.tar.gz` extracted (the server handles both); whether the endpoint `Environment` reaches the container (the version comes from `model_version.json` instead); and whether `FLOCI_SERVICES_ECR_PREFER_LOCAL_IMAGES` runs the image from the host cache or pulls it from Floci's registry.
 
 The Floci image tag is pinned in `infra/environments/local/runtime/terraform.tfvars`, never `latest`. Floci releases on the 15th and last day of each month: upgrading is its own pull request that bumps the tag, runs `mise run test`, and updates this table.
 
@@ -498,14 +522,16 @@ The Floci image tag is pinned in `infra/environments/local/runtime/terraform.tfv
 | --- | --- | --- |
 | Unit | Generator, reference feature definitions, repo rules, Terraform layout | Python only |
 | Flink SQL | `features.sql` unchanged, in streaming mode, against the reference on generated history plus the takeover | Local PyFlink 2.3 (`mise run test-flink`) |
-| Integration | Train → endpoint → invoke | Floci via testcontainers |
-| End to end | Gate 2: live events in, `txn-features` out, compared with the reference; later event in → score out and p95 latency | Full local stack (`mise run gate2`) |
+| Unit, model | Feature spec against the Avro schema, metrics, dataset split and reproducibility, `train` and `serve` from the container code, release packaging | Python only (xgboost) |
+| Integration | Runtime health, MLflow, ml stack resources | Running local runtime (`mise run test`) |
+| End to end | Gate 2: live events in, `txn-features` out, compared with the reference | Full local stack (`mise run gate2`) |
+| End to end | Gate 3: the approved version answers on the endpoint; takeover above every normal payment; latency | Floci endpoint (`mise run gate3`) |
 
 **POC success criteria**
 
 - [ ] `mise install` then `mise run up` builds every layer on a clean laptop with no cloud accounts
 - [ ] Training job completes on Floci and writes `model.tar.gz` to S3
-- [ ] Endpoint `fraud-score-v1` reaches `InService` and answers `InvokeEndpoint`
+- [ ] Endpoint `fraud-score` (config `fraud-score-v1`) reaches `InService` and answers `InvokeEndpoint`
 - [ ] Every event on `transactions` gets a row on `fraud-scores` with score, decision and model version
 - [ ] p95 end-to-end latency under 1 second at 50 events per second
 - [ ] Changing the model version variable rolls the endpoint to v2 with no Flink restart

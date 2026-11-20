@@ -107,7 +107,7 @@ run = "uvx --python 3.12 --with 'apache-flink==2.3.0' --with pytest pytest -p no
 
 [tasks.gate2]
 description = "Gate 2: live events through Kafka and CMF produce the reference features"
-run = "uv run pytest -m e2e tests/e2e -v"
+run = "uv run pytest -m e2e tests/e2e/test_features_live.py -v"
 
 [tasks.feed]
 description = "Send live synthetic payments to Kafka (extra args go to the generator, e.g. -- --rate 20 --live 300)"
@@ -120,6 +120,56 @@ run = "uv run python -m services.generators.transactions --output kafka --live 6
 [tasks.features]
 description = "Tail txn-features with the Avro console consumer inside the Schema Registry container"
 run = "docker exec -it schema-registry kafka-avro-console-consumer --bootstrap-server broker:29092 --topic txn-features --property schema.registry.url=http://localhost:8081"
+
+[tasks.build-model]
+description = "Build a model image and push it to its ECR repository on Floci"
+usage = 'arg "[model]" default="fraud-score" help="model directory under services/models, dashes for underscores"'
+run = 'scripts/build_model_image.sh "${usage_model}"'
+
+[tasks.dataset]
+description = "Build the labelled training dataset and upload it to S3 on Floci"
+usage = 'arg "[model]" default="fraud-score"'
+run = """
+#!/usr/bin/env bash
+set -euo pipefail
+uv run python -m "services.models.${usage_model//-/_}.pipeline" dataset
+"""
+
+[tasks.train]
+description = "Run a SageMaker training job on Floci, evaluate it and register it in MLflow"
+usage = 'arg "[model]" default="fraud-score"'
+run = """
+#!/usr/bin/env bash
+set -euo pipefail
+uv run python -m "services.models.${usage_model//-/_}.pipeline" train
+"""
+
+[tasks.models]
+description = "Registered versions of a model, with test metrics and the champion"
+usage = 'arg "[model]" default="fraud-score"'
+run = """
+#!/usr/bin/env bash
+set -euo pipefail
+uv run python -m "services.models.${usage_model//-/_}.pipeline" list
+"""
+
+[tasks.approve]
+description = "Release a registered version, then apply the local root to deploy it to the endpoint"
+usage = '''
+arg "<version>" help="MLflow registry version, from mise run models"
+flag "--model <model>" default="fraud-score"
+'''
+run = """
+#!/usr/bin/env bash
+set -euo pipefail
+uv run python -m "services.models.${usage_model//-/_}.pipeline" approve "${usage_version}"
+# Shows the plan (new model and endpoint config, endpoint updated) and asks first.
+scripts/with_cmf.sh terraform -chdir=infra/environments/local apply -input=false
+"""
+
+[tasks.gate3]
+description = "Gate 3: the released model scores on its SageMaker endpoint (Floci)"
+run = "uv run pytest -m e2e tests/e2e/test_fraud_score_endpoint.py -v -s"
 
 [tasks.lint]
 description = "Every pre-commit hook against every file"

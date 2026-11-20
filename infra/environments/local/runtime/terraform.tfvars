@@ -1,6 +1,7 @@
 floci_image                = "floci/floci:2.4.0"
 confluent_platform_version = "8.0.0"
 kind_node_image            = "kindest/node:v1.37.0"
+mlflow_image               = "ghcr.io/mlflow/mlflow:v3.18.0" # match mlflow-skinny in pyproject.toml
 
 # Pin flink_operator and cmf after the first successful install:
 # Chart versions, pinned. When one changes, update the image tags in

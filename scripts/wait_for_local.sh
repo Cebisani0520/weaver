@@ -32,6 +32,8 @@ wait_for "Kafka broker" \
   "[ \"\$(docker inspect -f '{{.State.Health.Status}}' broker)\" = healthy ]"
 wait_for "Schema Registry" \
   "curl -fsS http://localhost:8081/subjects"
+wait_for "MLflow" \
+  "curl -fsS http://localhost:5050/health"
 wait_for "kind node" \
   "kubectl wait --for=condition=Ready nodes --all --timeout=5s"
 wait_for "Flink operator" \
